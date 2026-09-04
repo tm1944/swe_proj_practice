@@ -5,11 +5,11 @@ class Header:
 	Host: Optional[str] = '' 
 	User_Agent: Optional[str] = ''
 	Content_Type: Optional[str] = ''
-	Content_Length: Optional[str] = ''
+	Content_Length: Optional[int] = 0
 
 @dataclass
 class Body:
-	body_dict: dict[str,str] 
+	data: bytes = b''
 
 
 
@@ -19,7 +19,7 @@ class Request:
 		self.version: str
 		self.path: str
 		self.header = Header()
-		self.body = Body({}) 
+		self.body = Body() 
 
 
 
@@ -37,24 +37,24 @@ class Request:
 	def _set_header_variables(self,param_dict: dict[str,str]):
 		for k,v in param_dict.items():
 			match k:
-				case 'Host:':
+				case 'Host':
 					self.header.Host = param_dict['Host']
 				case 'User-Agent':
 					self.header.User_Agent = param_dict['User-Agent']
 				case 'Content-Type':
 					self.header.Content_Type = param_dict['Content-Type']
 				case 'Content-Length':
-					self.header.Content_Length = param_dict['Content-Length']
+					self.header.Content_Length = int(param_dict['Content-Length'])
 
-	def _set_body_variables(self,lines_arr: list[str]):
-		self.body.body_dict = lines_arr[0]
+	def set_body_variables(self,body_buffer: bytes):
+		self.body.data = body_buffer
 
 	def _list_to_dict(self,arr: list[str])-> dict[str,str]:
 		arr_dict = {}
 		for string in arr:
 			if string == '':
 				break
-			string_to_list = string.split(':')
+			string_to_list = string.split(': ',1)
 			key_str = str(string_to_list[0])
 			arr_dict[key_str] = string_to_list[1]
 		return arr_dict
@@ -66,25 +66,24 @@ class Request:
 				res = arr[i+1:]
 		return res
 
+	def _parse_first_header_line(self, lines_arr: list[str]):
 
-	#only public function
-	def parse_request_str(self,req_str: str)-> bool:
-		lines_arr = req_str.split('\r\n')
 		params_arr = lines_arr[0].split(' ')
 		lines_arr.pop(0) # remove the variables
-
 		if len(params_arr) == 3:
 			self._set_request_variables(method=params_arr[0],path=params_arr[1],version=params_arr[2])
 		else:
 			print("Error: Corrupted Request")
-			return False
 
+	#only public function
+	def parse_request_str(self,req_str: str):
+		lines_arr = req_str.split('\r\n')
+		self._parse_first_header_line(lines_arr)
 		header_dict = self._list_to_dict(lines_arr)
 
 		self._set_header_variables(header_dict)
+
 		lines_arr = self._remove_parsed_values(lines_arr)
-		self._set_body_variables(lines_arr)
-		return True
 
 
 	def print_request_body(self):
@@ -100,12 +99,12 @@ class Request:
 			f"\tHost: {self.header.Host}\n"
 			f"\tUser-Agent: {self.header.User_Agent}\n"
 			f"\tContent-Type: {self.header.Content_Type}\n"
-			f"\tContent-Length: {self.header.Content_Type}\n"
+			f"\tContent-Length: {self.header.Content_Length}\n"
 		)
 
 		print() # \n
 
 		print(
-			"body\n"
-			f"\t{self.body.body_dict}"
+			"body:\n"
+			f"\t{self.body.data}"
 		)
